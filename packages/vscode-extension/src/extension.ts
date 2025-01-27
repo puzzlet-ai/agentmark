@@ -7,6 +7,7 @@ import {
 } from "@puzzlet/agentmark";
 import { getFrontMatter } from "@puzzlet/templatedx";
 import { createBoundedQueue } from "./boundedQueue";
+import type { AgentMarkOutputV1, AgentMarkOutput } from "@puzzlet/agentmark";
 import AllModelPlugins from '@puzzlet/all-models';
 import * as vscode from "vscode";
 
@@ -89,20 +90,33 @@ export function activate(context: vscode.ExtensionContext) {
         const output = result;
 
         const ch = vscode.window.createOutputChannel("agentMark");
-        if (output.result.text) {
-          ch.appendLine(`TEXT: ${output.result.text}`);
-          if (chatSettings && chatSettings.useChat) {
-            const rawConfig = await getRawConfig(ast, testProps);
-            const queue = createBoundedQueue(chatSettings.maxSize || 10);
-            rawConfig.messages.forEach((item) => queue.add({ role: item.role, message: item.content }));
-            queue.add({ role: 'assistant', message: output.result.text });
-            promptHistoryMap[name] = queue;
+        if (!output.version) {
+          const outpuv1 = output as AgentMarkOutputV1;
+          if (output.tools?.length) {
+            ch.appendLine(`TOOLS: ${JSON.stringify(output.tools, null, 2)}`);
           }
-        } else if (output.result.object) {
-          ch.appendLine(`OBJECT: ${JSON.stringify(output.result.object, null, 2)}`);
-        } else if (output.tools?.length) {
-          ch.appendLine(`TOOLS: ${JSON.stringify(output.tools, null, 2)}`);
+          if (outpuv1.result.text) {
+            ch.appendLine(`TEXT: ${outpuv1.result.text}`);
+            if (chatSettings && chatSettings.useChat) {
+              const rawConfig = await getRawConfig(ast, testProps);
+              const queue = createBoundedQueue(chatSettings.maxSize || 10);
+              rawConfig.messages.forEach((item) => queue.add({ role: item.role, message: item.content }));
+              queue.add({ role: 'assistant', message: outpuv1.result.text });
+              promptHistoryMap[name] = queue;
+            }
+          } else if (outpuv1.result.object) {
+            ch.appendLine(`OBJECT: ${JSON.stringify(outpuv1.result.object, null, 2)}`);
+          } 
+        } else if (output.version === 'v2.0') {
+          const outputv2 = output as AgentMarkOutput;
+          if (outputv2.tools?.length) {
+            ch.appendLine(`Tool Calls: ${JSON.stringify(outputv2.tools, null, 2)}`);
+          }
+          if (outputv2.result) {
+            ch.appendLine(`Result: ${outputv2.result.text}`);
+          }
         }
+       
         ch.show();
       } catch (error: any) {
         vscode.window.showErrorMessage("Error: " + error.message);
