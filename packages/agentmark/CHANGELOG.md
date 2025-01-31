@@ -1,5 +1,11 @@
 # @puzzlet/agentmark
 
+## 2.1.4
+
+### Patch Changes
+
+- db571b6: Add props to spans
+
 ## 2.1.3
 
 ### Patch Changes
